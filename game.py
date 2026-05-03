@@ -936,6 +936,7 @@ class Game:
         self.tome_anim_timer:       int   = 0
         self.score_popups:          list  = []
         self.pause_prev_state             = None
+        self._pause_just_entered          = False
         self.boss_confirm_idx:      int   = -1
         self.boss_gate_elapsed:     int   = 0
         self.vault_gamble_base:     int   = 0
@@ -1026,6 +1027,8 @@ class Game:
                 if _ev.type == pygame.KEYDOWN and _ev.key == pygame.K_ESCAPE:
                     self.pause_prev_state = self.state
                     self.state = State.PAUSED
+                    self._pause_just_entered = True
+                    break
 
         s = self.state
         if   s == State.TITLE:             self._upd_title(events)
@@ -2158,6 +2161,9 @@ class Game:
                     self.state = State.IN_ROOM
 
     def _upd_paused(self, events):
+        if getattr(self, '_pause_just_entered', False):
+            self._pause_just_entered = False
+            return
         r = self.renderer
         for ev in events:
             if ev.type == pygame.KEYDOWN:
