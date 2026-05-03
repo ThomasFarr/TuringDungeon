@@ -48,7 +48,7 @@ TITLE    = "Turing's Dungeon  —  CS 305 Study Game"
 
 async def main():
     pygame.init()
-    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H), pygame.SCALED)
     pygame.display.set_caption(TITLE)
 
     # Simple drawn icon
@@ -58,8 +58,9 @@ async def main():
     pygame.draw.line(icon, (220, 50, 50), (10, 22), (22, 28), 3)
     pygame.display.set_icon(icon)
 
-    clock = pygame.time.Clock()
-    game  = Game(screen)
+    clock      = pygame.time.Clock()
+    game       = Game(screen)
+    fullscreen = False
 
     running = True
     while running:
@@ -69,11 +70,20 @@ async def main():
         for ev in events:
             if ev.type == pygame.QUIT:
                 running = False
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                # ESC only quits from the title screen; everywhere else it pauses
-                from game import State
-                if game.state == State.TITLE:
-                    running = False
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_ESCAPE:
+                    from game import State
+                    if game.state == State.TITLE:
+                        running = False
+                # F11 or Alt+Enter toggles fullscreen
+                if ev.key == pygame.K_F11 or (
+                        ev.key == pygame.K_RETURN and (ev.mod & pygame.KMOD_ALT)):
+                    fullscreen = not fullscreen
+                    flags = pygame.FULLSCREEN | pygame.SCALED if fullscreen else pygame.SCALED
+                    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H), flags)
+                    game.screen = screen
+                    game.renderer.screen = screen
+                    game.renderer._surf  = pygame.Surface((SCREEN_W, SCREEN_H))
 
         game.update(events, dt)
         game.render()
