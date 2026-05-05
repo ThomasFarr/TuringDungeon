@@ -1636,14 +1636,29 @@ class Game:
             return
 
         if self.in_boss_mode:
-            if self.dungeon.boss_q_idx < self.boss_q_total:
-                # Feature 11: 30% chance of a boss attack between questions
-                if (self.fb_correct and self.dungeon.boss_q_idx > 0
-                        and random.random() < 0.30):
+            remaining = self.boss_q_total - self.dungeon.boss_q_idx
+
+            if not self.fb_correct:
+                # Wrong answer: check if a win is still mathematically possible
+                can_still_win = (self.dungeon.boss_correct + remaining) >= self.boss_needed_now
+                if not can_still_win:
+                    # Fail-fast: end the boss fight immediately as a loss
+                    self.boss_victory = False
+                    self.player.take_damage(30)
+                    self.player.break_streak()
+                    self.dungeon.retreat_from_room()
+                    self.state = State.BOSS_RESULT
+                    return
+                # Win still possible and more questions remain: boss retaliates
+                if remaining > 0:
                     self._trigger_boss_attack()
-                else:
-                    self._load_boss_question()
-                    self.state = State.IN_ROOM
+                    return
+                # Win still possible but no questions left — fall through to resolve
+
+            # Correct answer (or wrong on last Q but already won enough)
+            if remaining > 0:
+                self._load_boss_question()
+                self.state = State.IN_ROOM
             else:
                 won     = (self.dungeon.boss_correct >= self.boss_needed_now)
                 perfect = (self.dungeon.boss_correct >= self.boss_q_total)
@@ -1656,12 +1671,12 @@ class Game:
                     self.player.heal(25)
                     if perfect:
                         self.run_boss_perfects += 1
-                    self.dungeon.clear_current_room()   # marks boss room cleared
+                    self.dungeon.clear_current_room()
                     self.boss_beaten = True
                 else:
                     self.player.take_damage(30)
                     self.player.break_streak()
-                    self.dungeon.retreat_from_room()    # boss uncleared; can retry
+                    self.dungeon.retreat_from_room()
                 self.state = State.BOSS_RESULT
         else:
             if self.fb_correct:

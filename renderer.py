@@ -838,13 +838,6 @@ class Renderer:
             self._tc(f"{weak_marker}Floor {d.floor}  \u00b7  Room  \u00b7  "
                      f"{TOPICS.get(d.current_topic, d.current_topic)}", 60, self.f_med, tc)
 
-        tr = pygame.Rect(60, 84, self.W - 220, 20)
-        self._timer_bar(game.time_left, p.question_time, tr)
-        ts  = self.f_small.render(f"{max(0, int(game.time_left))}s", True, WHITE)
-        self.screen.blit(ts, (tr.right + 8, tr.y))
-        pen_s = self.f_tiny.render(f"Wrong: \u2212{p.wrong_penalty} HP", True, RED_DIM)
-        self.screen.blit(pen_s, (self.W - pen_s.get_width() - 14, tr.y))
-
         # Feature 14: Combo meter \u2014 show streak multiplier visually when streak >= 2
         streak = p.streak
         if streak >= 2:
@@ -859,9 +852,16 @@ class Renderer:
                 f_combo = self.f_med_b
             cs = f_combo.render(combo_txt, True, combo_col)
             cs.set_alpha(int(alpha_scale * 230))
-            self.screen.blit(cs, cs.get_rect(centerx=self.W // 2, y=44))
+            self.screen.blit(cs, cs.get_rect(centerx=self.W // 2, y=80))
 
-        qr = pygame.Rect(50, 112, self.W - 100, 200)
+        tr = pygame.Rect(60, 108, self.W - 220, 20)
+        self._timer_bar(game.time_left, p.question_time, tr)
+        ts  = self.f_small.render(f"{max(0, int(game.time_left))}s", True, WHITE)
+        self.screen.blit(ts, (tr.right + 8, tr.y))
+        pen_s = self.f_tiny.render(f"Wrong: \u2212{p.wrong_penalty} HP", True, RED_DIM)
+        self.screen.blit(pen_s, (self.W - pen_s.get_width() - 14, tr.y))
+
+        qr = pygame.Rect(50, 136, self.W - 100, 196)
         pygame.draw.rect(self.screen, PANEL, qr, border_radius=10)
         pygame.draw.rect(self.screen, tc, qr, 2, border_radius=10)
         if boss:
@@ -879,7 +879,7 @@ class Renderer:
                 flavor = "A phantom scholar challenges you..."
         self._t(flavor, (qr.x + 18, qr.y + 10), self.f_small, TEAL if tib else GRAY)
         q_text = getattr(game, '_teach_it_back_prompt', "") if tib else q["q"]
-        self._draw_wrapped(q_text, pygame.Rect(qr.x + 18, qr.y + 34, qr.w - 36, 162),
+        self._draw_wrapped(q_text, pygame.Rect(qr.x + 18, qr.y + 34, qr.w - 36, 158),
                            self.f_med_b, TEAL if tib else WHITE)
 
         choices   = getattr(game, 'q_data_choices', q["c"])
@@ -1005,45 +1005,79 @@ class Renderer:
                     self._tc("IRON WILL ACTIVATED  \u2014  you survive with 1 HP!",
                              222, self.f_small, (180, 180, 255))
 
-        er = pygame.Rect(60, 224, self.W - 120, 188)
+        deep = getattr(game, 'fb_deep_mode', False)
+
+        # Panel height differs: default is compact, deep dive expands to fit per-choice notes
+        er_y  = 224 if not deep else 200
+        er_h  = 308 if not deep else 416
+        er = pygame.Rect(60, er_y, self.W - 120, er_h)
         pygame.draw.rect(self.screen, PANEL, er, border_radius=10)
         pygame.draw.rect(self.screen, BORDER, er, 2, border_radius=10)
 
-        # Feature 2: deep-dive toggle button
-        deep = getattr(game, 'fb_deep_mode', False)
-        tgl_r = pygame.Rect(er.right - 138, er.y + 8, 126, 26)
-        tgl_lbl = "DEEP DIVE  ▼" if not deep else "BASIC  ▲"
+        tgl_r   = pygame.Rect(er.right - 152, er.y + 8, 140, 26)
+        tgl_lbl  = "DEEP DIVE  ▼" if not deep else "BASIC  ▲"
         tgl_fill = (20, 50, 80) if not deep else (50, 20, 80)
         tgl_col  = TEAL if not deep else PURPLE
         self._button(tgl_lbl, tgl_r, tgl_fill, tgl_fill, tgl_col, self.f_tiny, "fb_deep_toggle")
 
-        self._t("Explanation", (er.x + 16, er.y + 10), self.f_med_b, GOLD)
-        if deep:
-            # Deep dive: show full explanation + the other choices labelled
-            self._draw_wrapped(game.fb_explanation,
-                               pygame.Rect(er.x + 16, er.y + 42, er.w - 32, er.h // 2 - 20),
-                               self.f_small, WHITE)
-            fb_choices = getattr(game, 'q_data_choices', game.q_data.get("c", []))
-            fb_ans = getattr(game, 'fb_correct_idx', 0)
-            y_off = er.y + er.h // 2 + 10
-            for ci, ct in enumerate(fb_choices[:4]):
-                clr = GREEN if ci == fb_ans else RED_DIM
-                lbl = f"{'✓' if ci == fb_ans else '✗'}  {chr(65+ci)}.  {ct[:60]}"
-                ls = self.f_tiny.render(lbl, True, clr)
-                self.screen.blit(ls, (er.x + 16, y_off + ci * 18))
-        else:
-            # Basic: just show the explanation
-            self._draw_wrapped(game.fb_explanation,
-                               pygame.Rect(er.x + 16, er.y + 42, er.w - 32, er.h - 52),
-                               self.f_small, WHITE)
+        # Both modes restate the question + colour-coded choices; deep dive adds per-choice notes
+        self._t("Question", (er.x + 16, er.y + 10), self.f_med_b, GOLD)
+        q_text = game.q_data.get("q", "")
+        self._draw_wrapped(q_text,
+                           pygame.Rect(er.x + 16, er.y + 38, er.w - 180, 68),
+                           self.f_small, WHITE)
+        pygame.draw.line(self.screen, BORDER,
+                         (er.x + 12, er.y + 114), (er.right - 12, er.y + 114), 1)
 
+        fb_choices = getattr(game, 'q_data_choices', game.q_data.get("c", []))
+        fb_ans     = game.fb_correct_idx
+        chosen     = game.chosen
+        ce_data    = game.q_data.get("ce", "")
+
+        bh  = 38                        # choice box height
+        exp = 26 if deep else 0         # extra height per choice for the note line
+        gap = 8 if deep else 6          # gap between choice blocks
+        block = bh + exp + gap
+        y0 = er.y + 122
+
+        for ci, ct in enumerate(fb_choices[:4]):
+            is_corr = (ci == fb_ans)
+            was_ch  = (ci == chosen) and not is_corr
+            if is_corr:
+                fill_c, brd_c, txt_c = (10, 55, 15), GREEN,  GREEN
+            elif was_ch:
+                fill_c, brd_c, txt_c = (55, 10, 10), RED,    RED
+            else:
+                fill_c, brd_c, txt_c = (22, 22, 34), BORDER, GRAY
+
+            br = pygame.Rect(er.x + 12, y0 + ci * block, er.w - 24, bh)
+            pygame.draw.rect(self.screen, fill_c, br, border_radius=6)
+            pygame.draw.rect(self.screen, brd_c,  br, 2, border_radius=6)
+            badge = pygame.Rect(br.x + 6, br.y + (bh - 22) // 2, 22, 22)
+            pygame.draw.rect(self.screen, brd_c, badge, border_radius=4)
+            bl = self.f_small.render("ABCD"[ci], True, WHITE)
+            self.screen.blit(bl, bl.get_rect(center=badge.center))
+            icon = "✓  " if is_corr else ("✗  " if was_ch else "   ")
+            txt_surf = self.f_small.render(icon + ct, True, txt_c)
+            ty = br.y + (bh - txt_surf.get_height()) // 2
+            clip = pygame.Rect(badge.right + 6, br.y + 2, br.right - badge.right - 10, bh - 4)
+            self.screen.set_clip(clip)
+            self.screen.blit(txt_surf, (badge.right + 6, ty))
+            self.screen.set_clip(None)
+
+            if deep and is_corr:
+                note = ce_data if ce_data else game.fb_explanation
+                note_r = pygame.Rect(br.x + 32, br.bottom + 4, br.w - 40, exp - 4)
+                self._draw_wrapped(note, note_r, self.f_tiny, (100, 200, 100))
+
+        boss_y = (er.bottom + 16) if deep else 545
         if game.in_boss_mode:
             bq     = game.dungeon.boss_q_idx
             bsc    = game.dungeon.boss_correct
             needed = game.boss_needed_now
             total  = game.boss_q_total
             self._tc(f"Boss: {bq}/{total} answered   Correct: {bsc}   Need {needed}/{total} to win",
-                     430, self.f_med, GOLD)
+                     boss_y, self.f_med, GOLD)
         else:
             self._draw_hud(game.player, game.difficulty)
 
@@ -1687,7 +1721,7 @@ class Renderer:
         # Feature 7: Did You Know fact card
         fact = getattr(game, 'shop_fun_fact', '')
         if fact:
-            fr = pygame.Rect(40, self.H - 162, self.W - 80, 44)
+            fr = pygame.Rect(40, self.H - 216, self.W - 80, 44)
             pygame.draw.rect(self.screen, (8, 24, 8), fr, border_radius=8)
             pygame.draw.rect(self.screen, (30, 100, 30), fr, 2, border_radius=8)
             lbl_f = self.f_tiny.render("DID YOU KNOW?", True, (80, 200, 80))
@@ -2587,13 +2621,17 @@ class Renderer:
         colors = {"timer": RED, "confusion": PURPLE, "drain": GOLD_COIN}
         col = colors.get(atk, RED)
 
+        retaliate_s = self.f_small.render("The boss retaliates for your wrong answer!", True, RED_DIM)
+        retaliate_s.set_alpha(alpha)
+        self.screen.blit(retaliate_s, retaliate_s.get_rect(center=(cx, cy - 100)))
+
         title_s = self.f_huge.render(titles.get(atk, "BOSS ATTACK!"), True, col)
         title_s.set_alpha(alpha)
-        self.screen.blit(title_s, title_s.get_rect(center=(cx, cy - 60)))
+        self.screen.blit(title_s, title_s.get_rect(center=(cx, cy - 50)))
 
         desc_s = self.f_med.render(descs.get(atk, ""), True, WHITE)
         desc_s.set_alpha(alpha)
-        self.screen.blit(desc_s, desc_s.get_rect(center=(cx, cy + 20)))
+        self.screen.blit(desc_s, desc_s.get_rect(center=(cx, cy + 30)))
 
         # Animated ring pulse
         ring_r = int(60 + 40 * math.sin(t * 0.15))
